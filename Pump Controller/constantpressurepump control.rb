@@ -1,16 +1,16 @@
-#simplest ruby program to read from arduino serial, 
+#Ruby program that reads pressure from Arduino serial port and uses this to control  
 #using the SerialPort gem
 #(http://rubygems.org/gems/serialport)
 
 require "serialport"
-
+#methods for pump control
 def getRate
- pumpport.write("crate")
- pumpport.gets.chomp
+ pump_port.write("crate")
+ pump_port.gets.chomp
 end
 
 def setRate(rate, units)
- pumpport.write("irate [{#{rate}} {#{rate units}}]")
+ pump_port.write("irate [{#{rate}} {#{rate units}}]")
 end
 
 #params for pressure serial port
@@ -28,7 +28,11 @@ data_bits = 8
 stop_bits = 1
 parity = SerialPort::NONE
 
-pumpport = SerialPort.new(port_str, baud_rate, data_bits, stop_bits, parity)
+pump_port = SerialPort.new(port_str, baud_rate, data_bits, stop_bits, parity)
+
+#Run's at start up.
+setRate(25, "µl/min")
+pump_port.write("irun")
 
 #continously running program
 while true do
@@ -45,5 +49,36 @@ while true do
     #serial write decrease infuse rate
   end
 end
+
+#PIDcontrol
+istate = 0
+lastPressure = 0
+
+pgain = 2
+igain = 1
+dgain = 0
+
+
+error = target_pressure - pressure
+
+pTerm = pgain * error
+
+iState += error
+
+windupGaurd = WINDUP_GUARD_GAIN / igain;  
+
+  if (iState > windupGaurd) 
+    iState = windupGaurd;
+  else if (iState < -windupGaurd) 
+    iState = - windupGaurd;
+  end
+  
+iTerm = igain * iState;
+
+dterm = (dgain * (pressure - lastPressure))
+
+lastPressure = pressure
+
+return pTerm + iTerm - dTerm
 
 pressureport.close                       #see note 1
